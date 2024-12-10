@@ -1,0 +1,6 @@
+.venv/
+.ipynb_checkpoints/
+shhs/
+**.npy
+**.keras
+**__pycache__**
