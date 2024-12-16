@@ -59,13 +59,12 @@ class LSTM_SA(keras.Model):
         return cls(**config)
 
 @keras.saving.register_keras_serializable()
-def customized_loss(true, pred):
-    true = tf.squeeze(true, axis=-1)
-    pred = tf.squeeze(pred, axis=-1)
-    losss = LOSS_FUNCTION(true, pred)
+def customized_loss(true, pred): # this is for debugging only
+    loss_obj = LOSS_FUNCTION()
+    losss = loss_obj(true, pred)
     # save for debugging
     # np.save("../model/debug/true_pred.npy", np.hstack([true.numpy(), pred.numpy()]))
-    print(true, pred)
+    print(true.numpy().sum(), pred.numpy().sum())
     return losss
 
 CUSTOM_OBJECTS_TASKED = {

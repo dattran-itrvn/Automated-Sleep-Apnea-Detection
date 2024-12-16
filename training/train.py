@@ -53,21 +53,33 @@ def load_tfrecord_dataset(tfrecord_file, channel, batch_size, shuffle=True, cach
     positive_dataset = parsed_dataset.filter(lambda X, y: tf.equal(y[0], 1))
     negative_dataset = parsed_dataset.filter(lambda X, y: tf.equal(y[0], 0))
     
-    # Create a balanced dataset with equal positives and negatives
-    balanced_dataset = tf.data.Dataset.sample_from_datasets(
-        [positive_dataset, negative_dataset],
-        weights=[0.5, 0.5]  # Equal weight for positives and negatives
-    )
-    
     if shuffle:
-        balanced_dataset = balanced_dataset.shuffle(buffer_size=10000, seed=TRAIN_SEED, reshuffle_each_iteration=True)
+        positive_dataset = positive_dataset.shuffle(buffer_size=10000, seed=TRAIN_SEED, reshuffle_each_iteration=True)
+        negative_dataset = negative_dataset.shuffle(buffer_size=10000, seed=TRAIN_SEED, reshuffle_each_iteration=True)
     
-    # Batch and prefetch for performance
-    dataset = (balanced_dataset
-               .batch(batch_size, drop_remainder=True)  # Ensure full batches
-               .prefetch(tf.data.AUTOTUNE))
+    # Batch positives and negatives separately
+    half_batch_size = batch_size // 2
+    positive_batches = positive_dataset.batch(half_batch_size, drop_remainder=True)
+    negative_batches = negative_dataset.batch(half_batch_size, drop_remainder=True)
     
-    return dataset, dataset_size
+    # Zip positive and negative batches together
+    balanced_batches = tf.data.Dataset.zip((positive_batches, negative_batches))
+    
+    # Combine positive and negative batches into a single batch
+    def combine_batches(positive_batch, negative_batch):
+        X_pos, y_pos = positive_batch
+        X_neg, y_neg = negative_batch
+        X_combined = tf.concat([X_pos, X_neg], axis=0)
+        y_combined = tf.concat([y_pos, y_neg], axis=0)
+        return X_combined, y_combined
+    
+    balanced_dataset = balanced_batches.map(combine_batches, num_parallel_calls=tf.data.AUTOTUNE)
+    
+    # Prefetch for performance
+    balanced_dataset = balanced_dataset.prefetch(tf.data.AUTOTUNE)
+    
+    
+    return balanced_dataset, dataset_size
 
 
 def train_model(channel, train_path, val_path, checkpoint_path, first=True):
@@ -81,7 +93,7 @@ def train_model(channel, train_path, val_path, checkpoint_path, first=True):
 
     # Compile model
     model.compile(
-        loss=LOSS_FUNCTION(from_logits=False),# customized_loss,
+        loss=LOSS_FUNCTION(from_logits=False), # customized_loss, # 
         optimizer=OPTIMIZER(),
         metrics=[keras.metrics.BinaryAccuracy(threshold=0.5), keras.metrics.F1Score(threshold=0.5)],
         run_eagerly=True
