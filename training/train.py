@@ -12,12 +12,13 @@ import math
 import keras
 import pandas as pd
 import random
+from functools import partial
 
 TRAIN_SEED = 1
 tf.random.set_seed(TRAIN_SEED)
 np.random.seed(TRAIN_SEED) # for reproducibility
 
-def parse_tfrecord_fn(example):
+def parse_tfrecord_fn(example, channel):
     """Parses a single tf.train.Example back into the required input format."""
     feature_description = {
         'ext': tf.io.FixedLenFeature([WINDOW_SIZE * N_CHANNELS], tf.float32),
@@ -27,14 +28,16 @@ def parse_tfrecord_fn(example):
     
     X_ext = tf.reshape(parsed_example['ext'], (WINDOW_SIZE, N_CHANNELS))
     y = parsed_example['label']
-    
+    X_ext = X_ext[:, channel]
     return X_ext, y
 
-def load_tfrecord_dataset(tfrecord_file, batch_size, shuffle=True, cache_in_memory=False, cache_file=None):
+def load_tfrecord_dataset(tfrecord_file, channel, batch_size, shuffle=True, cache_in_memory=False, cache_file=None):
     raw_dataset = tf.data.TFRecordDataset(tfrecord_file, compression_type="GZIP")
     
+    parse_fn_with_channel = partial(parse_tfrecord_fn, channel=channel)
+
     # Parse the dataset
-    parsed_dataset = raw_dataset.map(parse_tfrecord_fn, num_parallel_calls=tf.data.AUTOTUNE)
+    parsed_dataset = raw_dataset.map(parse_fn_with_channel, num_parallel_calls=tf.data.AUTOTUNE)
     
     if cache_in_memory: # Cache in memory
         parsed_dataset = parsed_dataset.cache()  
@@ -78,13 +81,15 @@ def train_model(channel, train_path, val_path, checkpoint_path, first=True):
     if first:
         print(model.summary())
 
+    channel_num = MODEL_PARAMS['num']
+    
     # Load data
-    train_dataset, train_size = load_tfrecord_dataset(train_path, batch_size=BATCH_SIZE,
+    train_dataset, train_size = load_tfrecord_dataset(train_path, channel_num, batch_size=BATCH_SIZE,
                                                     shuffle=True, cache_in_memory=False, cache_file=None)
     if first:
         print(f"Training size: {train_size}")
     
-    val_dataset, val_size = load_tfrecord_dataset(val_path, batch_size=BATCH_SIZE, 
+    val_dataset, val_size = load_tfrecord_dataset(val_path, channel_num, batch_size=BATCH_SIZE, 
                                                 shuffle=False, cache_in_memory=False, cache_file=None)
     if first:
         print(f"Validation size: {val_size}")
@@ -115,7 +120,6 @@ def train_model(channel, train_path, val_path, checkpoint_path, first=True):
         callbacks=selected_callbacks,
         verbose=2
     )
-    
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Train LeNet-like model for Sleep apnea detection using Sp02 and PR')
@@ -149,7 +153,7 @@ if __name__ == "__main__":
         part = train_file[train_file.rfind("/") + len("train_") + 1: train_file.rfind(".tfrecord")]
         print(f"========================================================== Part {part} ({i + 1}/{len(train_files)}) ==========================================================")
         
-        checkpoint_path = args.checkpoint.replace(".keras", f"_{part}.keras")
+        checkpoint_path = args.checkpoint.replace(".keras", f"_{part}_ch_{args.channel}.keras")
         train_model(args.channel, train_file, val_file, checkpoint_path, first=(i==0))
 
     print("-----------Completed-----------")

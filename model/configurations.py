@@ -14,19 +14,22 @@ POSITIVE_PER_EPOCH = BATCH_SIZE // 2 # 16 positive and 16 negative per batch
 
 # optimal params resulting from Bayesian optimization procedure (given by paper)
 MODEL_PARAMS = {
-    "abdores": {
+    "thorres": {
+        "num": 0,
         "n1": 100,
         "n2": 50,
         "p1": 0.5,
         "p2": 0.5
     },
-    "thorres": {
+    "abdores": {
+        "num": 1,
         "n1": 100,
         "n2": 50,
         "p1": 0.5,
         "p2": 0.5
     },
     "EDR": {
+        "num": 2,
         "n1": 50,
         "n2": 20,
         "p1": 0.14,
