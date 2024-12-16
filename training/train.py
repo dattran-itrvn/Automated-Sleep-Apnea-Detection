@@ -29,6 +29,7 @@ def parse_tfrecord_fn(example, channel):
     X_ext = tf.reshape(parsed_example['ext'], (WINDOW_SIZE, N_CHANNELS))
     y = parsed_example['label']
     X_ext = X_ext[:, channel]
+    X_ext = X_ext[:, tf.newaxis]
     return X_ext, y
 
 def load_tfrecord_dataset(tfrecord_file, channel, batch_size, shuffle=True, cache_in_memory=False, cache_file=None):
@@ -72,7 +73,7 @@ def train_model(channel, train_path, val_path, checkpoint_path, first=True):
 
     # Compile model
     model.compile(
-        loss=LOSS_FUNCTION, # customized_loss,
+        loss=LOSS_FUNCTION,# customized_loss,
         optimizer=OPTIMIZER,
         metrics=[keras.metrics.BinaryAccuracy(threshold=0.5), keras.metrics.F1Score(threshold=0.5)],
         run_eagerly=True
@@ -81,7 +82,7 @@ def train_model(channel, train_path, val_path, checkpoint_path, first=True):
     if first:
         print(model.summary())
 
-    channel_num = MODEL_PARAMS['num']
+    channel_num = MODEL_PARAMS[channel]['num']
     
     # Load data
     train_dataset, train_size = load_tfrecord_dataset(train_path, channel_num, batch_size=BATCH_SIZE,
@@ -118,7 +119,7 @@ def train_model(channel, train_path, val_path, checkpoint_path, first=True):
         epochs=10,
         validation_data=val_dataset,
         callbacks=selected_callbacks,
-        verbose=2
+        verbose=1
     )
 
 if __name__ == "__main__":

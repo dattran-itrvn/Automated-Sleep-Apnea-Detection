@@ -2,7 +2,7 @@ import keras
 # Training
 SAMPLING_RATE = 5
 WINDOW_SIZE = 30 * SAMPLING_RATE
-N_CHANNELS = 1
+N_CHANNELS = 3
 
 LOSS_FUNCTION = keras.losses.BinaryCrossentropy(from_logits=False)
 
