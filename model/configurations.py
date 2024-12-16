@@ -4,11 +4,13 @@ SAMPLING_RATE = 5
 WINDOW_SIZE = 30 * SAMPLING_RATE
 N_CHANNELS = 3
 
-LOSS_FUNCTION = keras.losses.BinaryCrossentropy(from_logits=False)
-
-OPTIMIZER = keras.optimizers.Adadelta()
-
 BATCH_SIZE = 32
+NUM_EPOCHS = 1
+
+LOSS_FUNCTION = keras.losses.BinaryCrossentropy
+
+OPTIMIZER = keras.optimizers.Adadelta
+
 
 POSITIVE_PER_EPOCH = BATCH_SIZE // 2 # 16 positive and 16 negative per batch
 

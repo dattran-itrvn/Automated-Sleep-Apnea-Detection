@@ -49,16 +49,24 @@ def load_tfrecord_dataset(tfrecord_file, channel, batch_size, shuffle=True, cach
 
     dataset_size = -2
     
-    # Shuffle, batch, and prefetch for performance
+    # Separate positive and negative samples
+    positive_dataset = parsed_dataset.filter(lambda X, y: tf.equal(y[0], 1))
+    negative_dataset = parsed_dataset.filter(lambda X, y: tf.equal(y[0], 0))
+    
+    # Create a balanced dataset with equal positives and negatives
+    balanced_dataset = tf.data.Dataset.sample_from_datasets(
+        [positive_dataset, negative_dataset],
+        weights=[0.5, 0.5]  # Equal weight for positives and negatives
+    )
+    
     if shuffle:
-        dataset = (parsed_dataset
-                .shuffle(buffer_size=100000, seed=TRAIN_SEED, reshuffle_each_iteration=True)
-                .batch(batch_size)
-                .prefetch(tf.data.AUTOTUNE))
-    else:
-        dataset = (parsed_dataset
-               .batch(batch_size)
+        balanced_dataset = balanced_dataset.shuffle(buffer_size=10000, seed=TRAIN_SEED, reshuffle_each_iteration=True)
+    
+    # Batch and prefetch for performance
+    dataset = (balanced_dataset
+               .batch(batch_size, drop_remainder=True)  # Ensure full batches
                .prefetch(tf.data.AUTOTUNE))
+    
     return dataset, dataset_size
 
 
@@ -73,8 +81,8 @@ def train_model(channel, train_path, val_path, checkpoint_path, first=True):
 
     # Compile model
     model.compile(
-        loss=LOSS_FUNCTION,# customized_loss,
-        optimizer=OPTIMIZER,
+        loss=LOSS_FUNCTION(from_logits=False),# customized_loss,
+        optimizer=OPTIMIZER(),
         metrics=[keras.metrics.BinaryAccuracy(threshold=0.5), keras.metrics.F1Score(threshold=0.5)],
         run_eagerly=True
     )
@@ -116,7 +124,7 @@ def train_model(channel, train_path, val_path, checkpoint_path, first=True):
     # Train model
     model.fit(
         train_dataset,
-        epochs=10,
+        epochs=NUM_EPOCHS,
         validation_data=val_dataset,
         callbacks=selected_callbacks,
         verbose=1
@@ -147,6 +155,8 @@ if __name__ == "__main__":
         train_files = sorted(train_files)
         val_files = glob.glob(args.val_file.replace(".tfrecord", "*.tfrecord"))
         val_files = sorted(val_files)
+        
+        assert len(train_files) == len(val_files)
     
     for i in range(len(train_files)):
         train_file = train_files[i]
